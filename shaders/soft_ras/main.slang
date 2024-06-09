@@ -12,7 +12,7 @@
 import camera;
 import math;
 import transform;
-
+import lighting;
 struct RenderParams
 {
     float sigma;
@@ -50,10 +50,11 @@ float3 loadFloat3FromTensor(
 [CudaKernel]
 [Differentiable]
 [AutoPyBindCUDA]
-void main(
+void mainFunction(
     PerspectiveCamera camera,
     DiffTensorView<float> face_vertices,
     Transform transform,
+    Light light,
     DiffTensorView<float> output,
     RenderParams params) // control soft rasterization
 {
@@ -180,6 +181,13 @@ void main(
                 pdebug(softmax_sum);
                 pdebug3(color);
             }
+            // 光照计算
+            float3 fragPos = (A_world * barycentric.x + B_world * barycentric.y + C_world * barycentric.z);
+            float3 normal = normalize(cross(B_world - A_world, C_world - A_world));
+            float3 viewDir = normalize(camera.eye - fragPos);
+            float3 lightColor = no_diff(light.computeLighting(normal, viewDir, fragPos, 32.0)); // 假设 shininess 为 32.0
+
+            color = color * lightColor; // 应用光照颜色
         }
     }
 
